@@ -4,29 +4,33 @@ SELECT
     p.last_name,
     t.id,
     t.full_name AS team_name,
-	ROUND(
+	ROUND(COALESCE(
 	    CAST(SUM(CASE  
 	        WHEN pr.event_msg_type = 'FIELD_GOAL_MADE' AND pr.player1_id = p.id THEN 2
 	        WHEN pr.event_msg_type = 'FREE_THROW' AND pr.player1_id = p.id AND pr.score IS NOT NULL THEN 1 
 	        ELSE NULL 
 	    END) AS numeric) 
-	    / NULLIF(COUNT(DISTINCT pr.game_id), 0), 
+	    / NULLIF(COUNT(DISTINCT pr.game_id), 0),0), 
 	    2
 	) AS PPG,
 	
-	ROUND(
+	ROUND(COALESCE(
 	    CAST(SUM(CASE 
 	        WHEN pr.event_msg_type = 'FIELD_GOAL_MADE' AND pr.player2_id = p.id THEN 1 
 	        ELSE NULL 
 	    END) AS numeric) 
-	    / NULLIF(COUNT(DISTINCT pr.game_id), 0), 
+	    / NULLIF(COUNT(DISTINCT pr.game_id), 0),0), 
 	    2
 	) AS APG,
     COUNT(DISTINCT pr.game_id) AS games
 FROM play_records pr
 JOIN games g ON pr.game_id = g.id
-JOIN players p ON pr.player1_id = p.id OR pr.player2_id = p.id
-JOIN teams t ON pr.player1_team_id = t.id or pr.player2_team_id = t.id
+JOIN players p 
+    ON p.id = pr.player1_id
+	OR p.id = pr.player2_id -- Ensure the player is in the game
+JOIN teams t 
+    ON (pr.player1_id = p.id AND pr.player1_team_id = t.id)
+    OR (pr.player2_id = p.id AND pr.player2_team_id = t.id)  
 WHERE g.season_id = '22017'
 AND pr.event_msg_type IN ('FREE_THROW', 'FIELD_GOAL_MADE', 'FIELD_GOAL_MISSED', 'REBOUND')
 AND p.id IN (
@@ -45,7 +49,6 @@ AND p.id IN (
         AND pr2.event_msg_type IN ('FREE_THROW', 'FIELD_GOAL_MADE', 'FIELD_GOAL_MISSED', 'REBOUND')
     ) AS player_teams
     GROUP BY player_id
-    HAVING COUNT(DISTINCT team_id) > 1
     ORDER BY COUNT(DISTINCT team_id) DESC
     LIMIT 5
 )
