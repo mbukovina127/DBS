@@ -1,17 +1,27 @@
+with records as (
+	select 
+		*
+	from (select 
+			r.event_number,
+			r.pctimestring,
+			r.period,
+			r.event_msg_type,
+			lag(r.event_msg_type) over (partition by r.game_id order by r.event_number asc) as prev_msg_type,
+			r.player1_id,
+			lag(r.player1_id) over (partition by r.game_id order by r.event_number asc) as prev_player
+		from play_records r
+		where r.game_id = 22000529)
+	where player1_id = prev_player
+	and event_msg_type = 'FIELD_GOAL_MADE'
+	and prev_msg_type = 'REBOUND'
+)
+
 select 
 	p.id, 
 	p.first_name, 
 	p.last_name, 
-	r1.period, 
-	r1.pctimestring as period_time 
-from play_records r1
-join players p on r1.player1_id = p.id
-join play_records r2
-on r1.game_id = r2.game_id
-and r1.player1_id = r2.player1_id
-and r1.event_msg_type = 'FIELD_GOAL_MADE'
-and r2.event_msg_type = 'REBOUND'
-AND r1.event_number -1= r2.event_number
-where r1.game_id = 22000529
--- where r1.game_id = {{game_id}}
-order by r1.period ASC, r1.pctimestring::TIME DESC, p.id ASC
+	r.period, 
+	r.pctimestring as period_time 
+from records r
+join players p on r.player1_id = p.id
+order by r.period ASC, r.pctimestring::TIME DESC, p.id ASC
