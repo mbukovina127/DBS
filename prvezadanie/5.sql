@@ -25,7 +25,7 @@ order by tg.id asc, min(year_founded) asc
 	order by games.id
 )
 select 
-	t.id, t.nickname as team_name, 
+	t.id, t.team_name, 
 	t.away_matches as number_away_matches,
 	ROUND((t.away_matches * 100.0 / (t.away_matches + t.home_matches)), 2) as percentage_home_matches,
 	t.home_matches as number_home_matches,
@@ -33,9 +33,34 @@ select
 	t.away_matches + t.home_matches as total_games
 from (
 	select 
-		team_nick_games.id, team_nick_games.nickname,
+		team_nick_games.id, team_nick_games.team_name,
 		count(case when team_nick_games.home_team_id = team_nick_games.id then 1 else null end) as home_matches,
 		count(case when team_nick_games.away_team_id = team_nick_games.id then 1 else null end) as away_matches
-	from team_nick_games
-	group by team_nick_games.id, team_nick_games.nickname
+	from (
+			select games.id as gid, games.home_team_id, games.away_team_id, games.game_date, team_names.* from games
+			join 	(select
+						tg.id,
+						tg.team_name,
+						concat(min(year_founded), '-7-1 00:00:00')::timestamp as founded,
+						concat(case when max(year_active_till) = '2019' then '2999' else max(year_active_till) end
+								, '-6-30 00:00:00')::timestamp as active
+					from(
+						select h.team_id as id, 
+							concat(city,' ',h.nickname) as team_name, 
+							h.year_founded, 
+							h.year_active_till
+						from team_history h
+						order by h.team_id asc, h.year_founded asc 
+					) 
+					as tg
+				group by tg.id, tg.team_name
+				order by tg.id asc, min(year_founded) asc
+				) team_names 
+			on team_names.id in (games.home_team_id, games.away_team_id)
+			and games.game_date > team_names.founded
+			and games.game_date < team_names.active
+			order by games.id
+		)team_nick_games
+	group by team_nick_games.id, team_nick_games.team_name
+	order by team_nick_games.id asc, team_nick_games.team_name asc
 ) t
