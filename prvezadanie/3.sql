@@ -31,7 +31,8 @@ from (
 				r.player2_id,
 				r.player3_id,
 				r.event_msg_type,
-				diff
+				diff,
+				r.event_number
 			from 
 				(SELECT
 					event_number,
@@ -54,16 +55,31 @@ from (
 					AS diff
 				FROM play_records r
 				where r.game_id = 21701185 
-				and score is not null
+				and score_margin is not null
 				order by event_number asc
 				) as pts -- vybrane kose a free throws za kolko bodov
 			right join play_records r
 			on pts.event_number = r.event_number
 			WHERE r.event_msg_type in ('FREE_THROW', 'FIELD_GOAL_MADE', 'FIELD_GOAL_MISSED')
 			and r.game_id = 21701185
+			order by r.event_number
 			) as f -- vybrane vsetky eventy RIGHT JOIN
 		join players p
 		on p.id in (f.player1_id, f.player2_id, f.player3_id)
 		group by p.id, p.first_name, p.last_name
 	) l ) p
 order by points desc, shooting_percentage desc, FT_percentage desc, player_id asc
+
+-- duplikatne zaznamy
+-- select *
+-- from play_records r 
+-- where 202328 = r.player1_id
+-- and 21701185 = r.game_id
+-- and r.event_msg_type in ('FREE_THROW', 'FIELD_GOAL_MADE', 'FIELD_GOAL_MISSED')
+-- order by r.event_msg_type, r.event_number
+
+-- select *
+-- from play_records r 
+-- -- where 202328 = r.player1_id
+-- where 21701185 = r.game_id
+-- order by r.event_number

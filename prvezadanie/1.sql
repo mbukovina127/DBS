@@ -14,4 +14,4 @@ and r2.event_msg_type = 'REBOUND'
 AND r1.event_number -1= r2.event_number
 where r1.game_id = 22000529
 -- where r1.game_id = {{game_id}}
-order by r1.period ASC, r1.pctimestring DESC, p.id ASC
+order by r1.period ASC, r1.pctimestring::TIME DESC, p.id ASC

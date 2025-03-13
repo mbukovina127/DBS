@@ -27,7 +27,7 @@ FROM play_records pr
 JOIN games g ON pr.game_id = g.id
 JOIN players p 
     ON p.id = pr.player1_id
-	OR p.id = pr.player2_id -- Ensure the player is in the game
+	OR p.id = pr.player2_id 
 JOIN teams t 
     ON (pr.player1_id = p.id AND pr.player1_team_id = t.id)
     OR (pr.player2_id = p.id AND pr.player2_team_id = t.id)  
@@ -54,3 +54,13 @@ AND p.id IN (
 )
 GROUP BY p.id, p.first_name, p.last_name, t.id, t.full_name
 ORDER BY p.id ASC, t.id ASC;
+
+
+-- SELECT 
+-- *
+-- FROM play_records r
+-- join games g on g.id = r.game_id
+-- where g.season_id = '22017' 
+-- and 1628502 = r.player1_id and 1610612761 = r.player1_team_id or 1628502 = r.player2_id and 1610612761 = r.player2_team_id
+-- order by game_id
+
