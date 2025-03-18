@@ -2,7 +2,7 @@ with team_names as (select
 	tg.id,
 	tg.nickname,
 	concat(min(year_founded), '-7-1 00:00:00')::timestamp as founded,
-	concat(case when max(year_active_till) = '2019' then '2999' else max(year_active_till) end
+	concat(case when max(year_active_till) = '2019' then '2999' else max(year_active_till) end -- cheeky hack
 			, '-6-30 00:00:00'
 	)::timestamp as active
 from	(select h.team_id as id, 
