@@ -6,8 +6,8 @@ from (
 		l.first_name,
 		l.last_name,
 		l.points,
-		l.TWOPM,
-		l.THREEPM,
+		l.TWOPM as "2PM",
+		l.THREEPM as "3PM",
 		l.missed_shots,
 		ROUND(COALESCE(((l.TWOPM + l.THREEPM) * 100.0 / NULLIF((l.TWOPM + l.THREEPM + l.missed_shots), 0)),0), 2) AS shooting_percentage,
 		l.FTM,
@@ -57,13 +57,13 @@ from (
 				where r.game_id = 21701185 
 				and score_margin is not null
 				order by event_number asc
-				) as pts -- vybrane kose a free throws za kolko bodov
+				) as pts -- vybrane kose a free throws za kolko bodov 
 			right join play_records r
 			on pts.event_number = r.event_number
 			WHERE r.event_msg_type in ('FREE_THROW', 'FIELD_GOAL_MADE', 'FIELD_GOAL_MISSED')
 			and r.game_id = 21701185
 			order by r.event_number
-			) as f -- vybrane vsetky eventy RIGHT JOIN
+			) as f -- vybrane vsetky eventy RIGHT JOIN da sa to spojit do jedneho
 		join players p
 		on p.id in (f.player1_id, f.player2_id, f.player3_id)
 		group by p.id, p.first_name, p.last_name

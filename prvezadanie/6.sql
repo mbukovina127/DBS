@@ -25,7 +25,6 @@ from(select
 			and season_type = 'Regular Season'
 			and r.event_msg_type in ('FIELD_GOAL_MADE', 'FIELD_GOAL_MISSED')
 			AND g.season_id IN (
-			    -- Subquery to get seasons where the player played more than 50 games
 			    SELECT g.season_id
 			    FROM play_records r
 			    JOIN games g ON r.game_id = g.id
