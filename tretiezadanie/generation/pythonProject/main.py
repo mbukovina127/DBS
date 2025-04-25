@@ -1,0 +1,1 @@
+classes = ["nyingma","kagyu","jonang"]
