@@ -20,10 +20,9 @@ CREATE TABLE turn_log (
 
 CREATE TABLE battle_inventory (
     battle_id INT NOT NULL REFERENCES battle_table(id),
-    turn_id INT NOT NULL REFERENCES turn_log(id),
     item_id INT NOT NULL REFERENCES item_table(id),
     quantity INT NOT NULL,
-    PRIMARY KEY (battle_id, turn_id, item_id)
+    PRIMARY KEY (battle_id, item_id)
 );
 
 CREATE TABLE battle_log (
@@ -54,16 +53,20 @@ INSERT INTO battle_table (started) VALUES
     (NOW() - INTERVAL '30 minutes');
 
 INSERT INTO turn_log (battle_id, turn_number) VALUES
-    (1, 1), (1, 2), (1, 3),
-    (2, 1), (2, 2);
+    (1, 1),
+    (2, 1);
 
 INSERT INTO character_locations (character_id, location_id, change_time) VALUES
     (1, NULL, NOW() - INTERVAL '2 hours'),  -- Healing zone
     (2, NULL, NOW() - INTERVAL '90 minutes'),
-    (3, 1, NOW() - INTERVAL '45 minutes'),   -- In battle 1
-    (4, 2, NOW() - INTERVAL '15 minutes');   -- In battle 2
-
+    (3, NULL, NOW() - INTERVAL '45 minutes'),  
+    (4, NULL, NOW() - INTERVAL '15 minutes');
+INSERT INTO battle_inventory (battle_id, item_id, quantity) VALUES
+	(1, 1, 2),
+	(1, 4, 5),
+	(1, 2, 1);
 -- Enter Combat Procedure
+DROP PROCEDURE enter_combat cascade;
 CREATE OR REPLACE PROCEDURE enter_combat(p_char_id INT, p_battle_id INT)
 LANGUAGE plpgsql
 AS $$
@@ -110,16 +113,14 @@ BEGIN
         character_id,
         action_type,
         ap_used
-    )
-    SELECT 
+    ) VALUES (
         p_battle_id,  -- Fixed: Use parameter instead of function reference
-        tl.id,
+        current_turn,
         p_char_id,
         'JOINED',
         0  -- No AP cost to join
-    FROM turn_log tl
-    WHERE tl.battle_id = p_battle_id
-    AND tl.turn_number = current_turn;
+	);
+	
 
 	UPDATE CHARACTERS SET action_points = 0 WHERE id = p_char_id; -- setting action points to zero so the character can't do anything
 	
@@ -132,91 +133,9 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE loot_item(
-    battle_id INT,
-    char_id INT,
-    item_id INT
-)
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    loot_roll NUMERIC;
-    item_quantity INT;
-    existing_quantity INT;
-BEGIN
-    -- Roll 50% chance for success (random() returns 0.0 <= x < 1.0)
-    loot_roll := random();
-    
-    IF loot_roll < 0.5 THEN
-        RAISE NOTICE 'Loot attempt failed (rolled % < 0.5)', loot_roll;
-        RETURN;
-    END IF;
-
-    -- Check if item exists in battle inventory
-    SELECT quantity INTO item_quantity
-    FROM battle_inventory
-    WHERE battle_id = loot_item.battle_id
-      AND item_id = loot_item.item_id
-    LIMIT 1;
-
-    IF NOT FOUND THEN
-        RAISE NOTICE 'Item % not found in battle %', item_id, battle_id;
-        RETURN;
-    END IF;
-
-    -- Handle item quantity (decrease or remove)
-    IF item_quantity > 1 THEN
-        UPDATE battle_inventory
-        SET quantity = quantity - 1
-        WHERE battle_id = loot_item.battle_id
-          AND item_id = loot_item.item_id;
-    ELSE
-        DELETE FROM battle_inventory
-        WHERE battle_id = loot_item.battle_id
-          AND item_id = loot_item.item_id;
-    END IF;
-
-    -- Check if character already has this item
-    SELECT quantity INTO existing_quantity
-    FROM character_inventory
-    WHERE character_id = char_id
-      AND item_id = loot_item.item_id
-    LIMIT 1;
-
-    -- Add to character inventory
-    IF FOUND THEN
-        UPDATE character_inventory
-        SET quantity = quantity + 1
-        WHERE character_id = char_id
-	  	AND item_id = loot_item.item_id;
-    ELSE
-        INSERT INTO character_inventory (character_id, item_id, quantity)
-        VALUES (char_id, loot_item.item_id, 1);
-    END IF;
-
-    RAISE NOTICE 'Character % successfully looted item % from battle %',
-        char_id, item_id, battle_id;
-    
-    -- Log the loot action
-    INSERT INTO battle_log (
-        battle_id,
-        character_id,
-        item_id,
-        action_type,
-        ap_used
-    )
-    VALUES (
-        battle_id,
-        char_id,
-        item_id,
-        'LOOTED',
-        0  -- Assuming looting costs 1 AP
-    );
-END;
-$$;
-call enter_combat(1,1);
-select * from character_locations
-order by character_id, change_time desc;
-select * from battle_table bt
-join turn_log tl on tl.battle_id = bt.id
-join battle_log bl on bl.battle_id = bt.id and tl.turn_number = bl.turn_id;
+-- call enter_combat(1,1);
+-- select * from character_locations
+-- order by character_id, change_time desc;
+-- select * from battle_table bt
+-- join turn_log tl on tl.battle_id = bt.id
+-- join battle_log bl on bl.battle_id = bt.id and tl.turn_number = bl.turn_id;
