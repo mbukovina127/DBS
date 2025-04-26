@@ -1,203 +1,4 @@
-DROP TABLE IF EXISTS classes CASCADE;
-DROP TABLE IF EXISTS characters CASCADE;
--- Insert dream-themed classes with your exact schema
-CREATE TABLE classes (
-    id INT PRIMARY KEY,
-    base_health NUMERIC NOT NULL,
-    base_strength NUMERIC NOT NULL,
-    base_dexterity NUMERIC NOT NULL,
-    base_intelligence NUMERIC NOT NULL,
-    base_constitution NUMERIC NOT NULL,
-    base_action_points NUMERIC NOT NULL,
-    health_modifier NUMERIC NOT NULL,
-    strength_modifier NUMERIC NOT NULL,
-    dexterity_modifier NUMERIC NOT NULL,
-    intelligence_modifier NUMERIC NOT NULL,
-    constitution_modifier NUMERIC NOT NULL,
-    encumbrance_modifier NUMERIC NOT NULL,
-    defence_modifier NUMERIC NOT NULL,
-    ap_modifier NUMERIC NOT NULL
-);
-INSERT INTO classes (
-    id,
-    base_health,
-    base_strength,
-    base_dexterity,
-    base_intelligence,
-    base_constitution,
-    base_action_points,
-    health_modifier,
-    strength_modifier,
-    dexterity_modifier,
-    intelligence_modifier,
-    constitution_modifier,
-    encumbrance_modifier,
-    defence_modifier,
-    ap_modifier
-) VALUES
--- 1. Dreamwalker (balanced dream explorer)
-(
-    1,              -- id
-    100,            -- base_health
-    10,             -- base_strength
-    12,             -- base_dexterity
-    16,             -- base_intelligence
-    12,             -- base_constitution
-    8,              -- base_action_points
-    10,             -- health_modifier (+10%)
-    -5,             -- strength_modifier (-5%)
-    15,             -- dexterity_modifier (+15%)
-    20,             -- intelligence_modifier (+20%)
-    0,              -- constitution_modifier (+0%)
-    -10,            -- encumbrance_modifier (-10%)
-    5,              -- defence_modifier (+5%)
-    10              -- ap_modifier (+10%)
-),
-
--- 2. Oneironaut (lucid dreaming specialist)
-(
-    2,
-    80,
-    8,
-    14,
-    20,
-    10,
-    10,
-    -5,
-    -10,
-    5,
-    30,
-    -5,
-    -15,
-    0,
-    15
-),
-
--- 3. Nightmare Warden (dream protector)
-(
-    3,
-    120,
-    16,
-    10,
-    12,
-    16,
-    6,
-    20,
-    15,
-    0,
-    10,
-    20,
-    5,
-    15,
-    5
-),
-
--- 4. Meditation Sage (focused discipline)
-(
-    4,
-    90,
-    6,
-    16,
-    18,
-    14,
-    12,
-    5,
-    -15,
-    10,
-    25,
-    15,
-    -20,
-    10,
-    20
-);
-CREATE TABLE characters (
-    id INT PRIMARY KEY,
-    class_id INT REFERENCES classes(id),
-    nickname TEXT NOT NULL,
-    health NUMERIC,
-    strength NUMERIC,
-    dexterity NUMERIC,
-    intelligence NUMERIC,
-    constitution NUMERIC,
-    encumbrance NUMERIC,
-	defence NUMERIC,
-    action_points NUMERIC
-);
--- Insert sample characters with NULL for derived stats
-INSERT INTO characters (
-    id,
-    class_id,
-    nickname,
-    health,
-    strength,
-    dexterity,
-    intelligence,
-    constitution,
-    encumbrance,
-	defence,
-    action_points
-) VALUES
--- Dreamwalker character
-(
-    1,
-    1,
-    'Lumen the Awake',
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL   -- will be derived
-),
-
--- Oneironaut character
-(
-    2,
-    2,
-    'Phantasos',
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL
-),
-
--- Nightmare Warden character
-(
-    3,
-    3,
-    'Morpheus Guardian',
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL
-),
-
--- Meditation Sage character
-(
-    4,
-    4,
-    'Zenith the Clear',
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL
-);
-
-CREATE OR REPLACE FUNCTION get_max_health(f_char_id NUMERIC)
+CREATE OR REPLACE FUNCTION get_max_health(f_char_id INT)
 RETURNS NUMERIC
 LANGUAGE plpgsql
 AS $$
@@ -222,7 +23,7 @@ BEGIN
     RETURN max_health;
 END;
 $$;
-CREATE OR REPLACE FUNCTION items_weight(f_char_id NUMERIC)
+CREATE OR REPLACE FUNCTION items_weight(f_char_id INT)
 RETURNS NUMERIC
 LANGUAGE plpgsql
 AS $$
@@ -239,7 +40,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE update_character_attributes(character_id NUMERIC)
+CREATE OR REPLACE PROCEDURE update_character_attributes(character_id INT)
 LANGUAGE plpgsql
 AS $$
 DECLARE
@@ -407,8 +208,8 @@ BEGIN
     LIMIT 1;
 
     -- Check if location data exists
-    IF last_change IS NOT NULL THEN
-        RAISE NOTICE 'Character % has no location history - cannot determine rest duration', p_char_id;
+    IF last_position IS NOT NULL THEN
+        RAISE NOTICE 'Character % is already in battle %', p_char_id, last_position;
         RETURN;
     END IF;
 
@@ -431,9 +232,7 @@ BEGIN
     -- Update character health if they gained any
     IF health_to_add > 0 THEN
         UPDATE characters
-        SET health = LEAST(current_health + health_to_add, max_health),
-            updated_at = NOW()
-        WHERE id = p_char_id;
+        SET health = LEAST(current_health + health_to_add, max_health) WHERE id = p_char_id;
 		-- REMOVE THESE
         RAISE NOTICE 'Character % rested for % hours (% minutes), gained % health (now %/% HP)',
             p_char_id,
@@ -450,18 +249,4 @@ BEGIN
     END IF;
 END;
 $$;
-
-
-DO $$
-DECLARE
-    c RECORD;
-BEGIN
-    FOR c IN SELECT id FROM characters
-    LOOP
-        call update_character_attributes(c.id);
-    END LOOP;
-END;
-$$;
-	
-select * from characters 
 	

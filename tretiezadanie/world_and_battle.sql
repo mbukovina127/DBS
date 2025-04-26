@@ -24,6 +24,9 @@ CREATE TABLE battle_inventory (
     quantity INT NOT NULL,
     PRIMARY KEY (battle_id, item_id)
 );
+CREATE INDEX idx_bttl_inv_battle_id ON battle_inventory(battle_id);
+CREATE INDEX idx_bttl_inv_item_id ON battle_inventory(item_id);
+CREATE INDEX idx_bttl_inv_battle_id ON battle_inventory(battle_id);
 
 CREATE TABLE battle_log (
     id SERIAL PRIMARY KEY,
@@ -38,6 +41,11 @@ CREATE TABLE battle_log (
     damage NUMERIC,
     log_time TIMESTAMP NOT NULL DEFAULT NOW()
 );
+CREATE INDEX idx_battle_log_battle_turn ON battle_log(battle_id, turn_id);
+CREATE INDEX idx_battle_log_character_action ON battle_log(character_id, action_type);
+CREATE INDEX idx_battle_log_target_damage ON battle_log(target_id, damage) WHERE damage IS NOT NULL;
+CREATE INDEX idx_battle_log_spell_actions ON battle_log(spell_id, action_type) WHERE spell_id IS NOT NULL;
+CREATE INDEX idx_battle_log_item_actions ON battle_log(item_id, action_type) WHERE item_id IS NOT NULL;
 
 -- WORLD TABLE
 CREATE TABLE character_locations (
@@ -46,6 +54,8 @@ CREATE TABLE character_locations (
     change_time TIMESTAMP NOT NULL DEFAULT NOW(),
     FOREIGN KEY (location_id) REFERENCES battle_table(id)
 );
+CREATE INDEX idx_char_loc_battle_chars ON character_locations(location_id, character_id) WHERE location_id IS NOT NULL;
+CREATE INDEX idx_char_loc_char_history ON character_locations(character_id, change_time DESC, location_id);
 
 -- Sample data
 INSERT INTO battle_table (started) VALUES 
@@ -114,13 +124,14 @@ BEGIN
         action_type,
         ap_used
     ) VALUES (
-        p_battle_id,  -- Fixed: Use parameter instead of function reference
+        p_battle_id,
         current_turn,
         p_char_id,
         'JOINED',
         0  -- No AP cost to join
 	);
 	
+	CALL update_character_attributes(p_char_id);
 
 	UPDATE CHARACTERS SET action_points = 0 WHERE id = p_char_id; -- setting action points to zero so the character can't do anything
 	
@@ -129,13 +140,6 @@ BEGIN
     VALUES (p_char_id, p_battle_id);
 
     RAISE NOTICE 'Character % joined battle % on turn %', 
-        p_char_id, p_battle_id, current_turn;  -- Fixed: Use parameter names
+        p_char_id, p_battle_id, current_turn; 
 END;
 $$;
-
--- call enter_combat(1,1);
--- select * from character_locations
--- order by character_id, change_time desc;
--- select * from battle_table bt
--- join turn_log tl on tl.battle_id = bt.id
--- join battle_log bl on bl.battle_id = bt.id and tl.turn_number = bl.turn_id;

@@ -13,6 +13,10 @@ DECLARE
     v_quantity INT;
 	v_number_of_players INT;
 BEGIN
+	IF NOT EXISTS (SELECT 1 FROM battle_table WHERE id = p_battle_id) THEN
+        RAISE EXCEPTION 'Battle with ID % does not exist', p_battle_id;
+    END IF;
+	
     -- Get current turn number
     SELECT MAX(turn_number) INTO v_current_turn
     FROM turn_log
@@ -29,7 +33,7 @@ BEGIN
         AND turn_id = v_current_turn
         AND action_type = 'FLEE'
     ) LOOP
-        -- 50% chance to successfully leave
+        -- chance to leave
         v_leave_chance := random();
         v_left := (v_leave_chance > (GREATEST(1 - v_number_of_players/5.0), 0.1)); -- CHANGE TO FUNCTION I HAVE SPECIFIED
         
@@ -58,18 +62,19 @@ BEGIN
             RAISE NOTICE 'Character % failed to flee battle %', v_character_id, p_battle_id;
         END IF;
     END LOOP;
-    
     -- Process damage and check for deaths 
     FOR v_character_id IN (
 	    SELECT DISTINCT bl.character_id
 	    FROM battle_log bl
 	    JOIN (
-	        SELECT character_id, MAX(change_time) as latest_time
-	        FROM character_locations cl
-	        GROUP BY character_id
+	        SELECT DISTINCT ON (character_id)
+	            character_id,
+	            location_id,
+	            change_time
+	        FROM character_locations
+	        ORDER BY character_id, change_time DESC
 	    ) latest_loc ON bl.character_id = latest_loc.character_id
-	    JOIN character_locations cl ON latest_loc.character_id = cl.character_id AND latest_loc.latest_time = cl.change_time
-	    WHERE cl.location_id = p_battle_id 
+	    WHERE latest_loc.location_id = p_battle_id 
 	    AND bl.character_id IS NOT NULL
 	    AND bl.battle_id = p_battle_id  
     ) LOOP
@@ -91,20 +96,34 @@ BEGIN
         IF v_current_health <= 0 THEN
             -- Move items to battle inventory
             FOR v_item_id, v_quantity IN (
-                SELECT item_id, quantity 
-                FROM character_inventory ci 
-                WHERE ci.owner_id = v_character_id
-            ) LOOP
-                INSERT INTO battle_inventory (
-                    battle_id,
-                    item_id,
-                    quantity
-                ) VALUES (
-                    p_battle_id,
-                    v_item_id,
-                    v_quantity
-                );
-            END LOOP;
+			    SELECT item_id, quantity 
+			    FROM character_inventory
+			    WHERE owner_id = v_character_id
+			) LOOP
+			    -- Check if item already exists in battle inventory
+			    IF EXISTS (
+			        SELECT 1 FROM battle_inventory
+			        WHERE battle_id = p_battle_id
+			        AND item_id = v_item_id
+			    ) THEN
+			        -- Update existing item quantity
+			        UPDATE battle_inventory
+			        SET quantity = quantity + v_quantity
+			        WHERE battle_id = p_battle_id
+			        AND item_id = v_item_id;
+			    ELSE
+			        -- Insert new item
+			        INSERT INTO battle_inventory (
+			            battle_id,
+			            item_id,
+			            quantity
+			        ) VALUES (
+			            p_battle_id,
+			            v_item_id,
+			            v_quantity
+			        );
+			    END IF;
+			END LOOP;
             
             -- Clear character inventory
             DELETE FROM character_inventory WHERE owner_id = v_character_id;
@@ -166,12 +185,14 @@ BEGIN
 		SELECT DISTINCT bl.character_id
 	    FROM battle_log bl
 	    JOIN (
-	        SELECT character_id, MAX(change_time) as latest_time
-	        FROM character_locations cl
-	        GROUP BY character_id
+	        SELECT DISTINCT ON (character_id)
+	            character_id,
+	            location_id,
+	            change_time
+	        FROM character_locations
+	        ORDER BY character_id, change_time DESC
 	    ) latest_loc ON bl.character_id = latest_loc.character_id
-	    JOIN character_locations cl ON latest_loc.character_id = cl.character_id AND latest_loc.latest_time = cl.change_time
-	    WHERE cl.location_id = p_battle_id 
+	    WHERE latest_loc.location_id = p_battle_id 
 	    AND bl.character_id IS NOT NULL
 	    AND bl.battle_id = p_battle_id  
     ) LOOP
@@ -184,15 +205,3 @@ BEGIN
     VALUES (p_battle_id, v_current_turn+1);
 END;
 $$;
-call enter_combat(1,1);
-call enter_combat(2,1);
-call enter_combat(3,1);
-call cast_spell(1,1,2);
-call queue_loot_item(4,1);
-select*from battle_log;
-select*from turn_log;
-select*from characters;
-select*from character_inventory where owner_id = 2;
-select*from battle_inventory;
-select*from character_locations order by change_time desc;
-call reset_round(1);

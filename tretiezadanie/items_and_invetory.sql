@@ -1,43 +1,3 @@
-DROP TABLE IF EXISTS item_table CASCADE;
-DROP TABLE IF EXISTS character_inventory CASCADE;
-DROP TABLE IF EXISTS item_modifiers CASCADE;
--- ITEMS
-CREATE TABLE item_table (
-	id SERIAL PRIMARY KEY,
-	name TEXT not null,
-	weight NUMERIC not null
-);
-CREATE TABLE character_inventory (
-	item_id INT REFERENCES item_table(id),
-	owner_id INT REFERENCES characters(id),
-	quantity INT not null
-);
-CREATE TABLE item_modifiers (
-	item_id INT REFERENCES item_table(id),
-	affected_att TEXT not null,
-	effect_factor NUMERIC not null
-);
--- Additional items
-INSERT INTO item_table (name, weight) VALUES
-('Dreamcatcher Pendant', 0.3),
-('Meditation Robe', 2.0),
-('Incense of Clarity', 0.5),
-('Astral Crystal', 1.0);
-
--- Inventory for character with ID 2
-INSERT INTO character_inventory (item_id, owner_id, quantity) VALUES
-(1, 1, 1),  -- Dreamcatcher Pendant
-(2, 1, 1),  -- Meditation Robe
-(3, 1, 3),  -- 3x Incense of Clarity
-(4, 1, 1);  -- Astral Crystal
-
--- Modifiers for new items
-INSERT INTO item_modifiers (item_id, affected_att, effect_factor) VALUES
-(1, 'INT', 8),       -- Dreamcatcher Pendant +8% intelligence
-(2, 'DEF', 10),      -- Meditation Robe +10% defence
-(3, 'AP', 5),        -- Incense of Clarity +5% action points
-(4, 'HP', 12);       -- Astral Crystal +12% max health
-
 DROP PROCEDURE queue_loot_item cascade;
 CREATE OR REPLACE PROCEDURE queue_loot_item(
     char_id INT,
@@ -48,7 +8,7 @@ AS $$
 DECLARE
 	current_battle INT;
 	current_turn INT;
-	quantity INT;
+	item_quantity INT;
 	ap NUMERIC;
 BEGIN 
 	SELECT location_id into current_battle
@@ -58,7 +18,7 @@ BEGIN
 	LIMIT 1;
 
 	IF current_battle IS NULL THEN
-		RAISE NOTICE 'Character is not in batlle';
+		RAISE NOTICE 'Character ID % is not in batlle', char_id;
 		RETURN;
 	END IF;
 
@@ -66,12 +26,17 @@ BEGIN
 	FROM turn_log tl
 	where tl.battle_id = current_battle;
 
-	SELECT bi.quantity INTO quantity FROM battle_inventory bi where bi.battle_id = current_battle and bi.item_id = p_item_id;
+	-- Check if item exists in battle inventory
+    SELECT quantity INTO item_quantity
+    FROM battle_inventory
+    WHERE battle_id = current_battle
+      AND item_id = p_item_id
+    LIMIT 1;
 
-	IF NOT FOUND THEN
-		RAISE NOTICE 'Item isnt on the battlefield';
-		RETURN;
-	END IF;
+    IF NOT FOUND THEN
+        RAISE NOTICE 'Item % not found in battle %', p_item_id, current_battle;
+        RETURN;
+    END IF;
 	
 	SELECT action_points into ap from characters c where c.id = char_id;
 
