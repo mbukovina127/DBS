@@ -142,9 +142,13 @@ CREATE INDEX idx_spell_modifiers_spell_id ON spell_modifiers(spell_id);
 CREATE INDEX idx_char_inv_owner_id ON character_inventory(owner_id);
 CREATE INDEX idx_char_inv_item_id ON character_inventory(item_id);
 CREATE INDEX idx_item_modifiers_item_id ON item_modifiers(item_id);
---BATTLE
 CREATE INDEX idx_bttl_inv_item_id ON battle_inventory(item_id);
 CREATE INDEX idx_bttl_inv_battle_id ON battle_inventory(battle_id);
+--BATTLE
+CREATE INDEX idx_battle_log_battle_turn ON battle_log(battle_id, turn_id);
+CREATE INDEX idx_battle_log_character_action ON battle_log(character_id, action_type);
+CREATE INDEX idx_battle_log_turn_action ON battle_log(battle_id, turn_id, action_type);
+CREATE INDEX idx_battle_log_target_damage ON battle_log(target_id, damage) WHERE damage IS NOT NULL;
 --WORLD
 CREATE INDEX idx_char_loc_battle_chars ON character_locations(location_id, character_id) WHERE location_id IS NOT NULL;
 CREATE INDEX idx_char_loc_char_history ON character_locations(character_id, change_time DESC, location_id);
@@ -262,14 +266,14 @@ INSERT INTO characters (
     1,
     1,
     'Lumen the Awake',
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL,  -- will be derived
-    NULL   -- will be derived
+    NULL, 
+    NULL, 
+    NULL, 
+    NULL, 
+    NULL, 
+    NULL, 
+    NULL, 
+    NULL  
 ),
 
 -- Oneironaut character

@@ -90,7 +90,7 @@ call cast_spell(1,2,2);
 call cast_spell(2,3,1);
 call cast_spell(2,4,3);
 call cast_spell(2,4,3);
-call reset_round(3);
+call reset_round(1);
 select*from battle_log;
 select*from turn_log;
 select*from characters;
