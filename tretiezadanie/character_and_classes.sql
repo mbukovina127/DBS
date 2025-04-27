@@ -1,3 +1,7 @@
+DROP FUNCTION IF EXISTS get_max_health CASCADE;
+DROP FUNCTION IF EXISTS items_weight CASCADE;
+DROP PROCEDURE IF EXISTS update_character_attributes CASCADE;
+
 CREATE OR REPLACE FUNCTION get_max_health(f_char_id INT)
 RETURNS NUMERIC
 LANGUAGE plpgsql
@@ -23,6 +27,7 @@ BEGIN
     RETURN max_health;
 END;
 $$;
+
 CREATE OR REPLACE FUNCTION items_weight(f_char_id INT)
 RETURNS NUMERIC
 LANGUAGE plpgsql

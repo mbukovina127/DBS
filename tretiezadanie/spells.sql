@@ -1,3 +1,6 @@
+DROP FUNCTION IF EXISTS effective_spell_stats CASCADE;
+DROP PROCEDURE IF EXISTS cast_spell CASCADE;
+
 CREATE OR REPLACE FUNCTION effective_spell_stats(
     f_char_id INT,
     f_spell_id INT
@@ -81,7 +84,6 @@ BEGIN
     RETURN NEXT;
 END;
 $$;
-DROP PROCEDURE cast_spell CASCADE;
 CREATE OR REPLACE PROCEDURE cast_spell(
     p_char_id INT,
     p_spell_id INT,
@@ -95,7 +97,7 @@ DECLARE
     v_has_spell BOOLEAN;
     v_spell_stats RECORD;
     v_current_ap NUMERIC;
-    v_target_valid BOOLEAN;
+	v_target_defence NUMERIC;
     v_accuracy_roll NUMERIC;
     v_damage_dealt NUMERIC;
 BEGIN
@@ -142,25 +144,32 @@ BEGIN
 		RETURN;
     END IF;
     
-	IF p_target_id IS NOT NULL THEN
-	    -- Check if target is in same battle and hasn't LEFT
-	    SELECT EXISTS (
-	        SELECT 1 FROM 
-			(
+	SELECT s.defence INTO v_target_defence
+	FROM 
+		(
+		SELECT * 
+		FROM(
 				SELECT DISTINCT ON (character_id) 
-				    character_id, 
-				    location_id, 
-				    change_time
+					character_id, 
+					location_id, 
+					change_time
 				FROM character_locations
 				ORDER BY character_id, change_time DESC			
 			)
-	        WHERE location_id = v_battle_id
-	        AND character_id = p_target_id
-	    ) INTO v_target_valid;
-	    IF NOT v_target_valid THEN
-	        RAISE NOTICE 'Target % is not a valid target in this battle', p_target_id;
-			RETURN;
-	    END IF;
+		JOIN characters c ON character_id = id
+		WHERE location_id = v_battle_id
+		AND character_id = p_target_id
+		) s
+	WHERE NOT EXISTS (
+		SELECT 1 FROM battle_log bl
+		where bl.action_type = 'JOINED' 
+		and bl.turn_id = v_current_turn
+		and bl.character_id = p_target_id
+	);
+	
+	IF NOT FOUND THEN
+		RAISE NOTICE 'Target % is not a valid target in this battle/turn', p_target_id;
+		RETURN;
 	END IF;
     
     -- Accuracy check
@@ -192,7 +201,8 @@ BEGIN
               ROUND(v_accuracy_roll, 2), ROUND(v_spell_stats.final_accuracy, 2);
     ELSE
         -- Spell hit
-        v_damage_dealt := v_spell_stats.final_damage;
+		
+        v_damage_dealt := (v_spell_stats.final_damage - v_spell_stats.final_damage*LEAST((v_target_defence/100), 0.9));
         
         INSERT INTO battle_log (
             battle_id,

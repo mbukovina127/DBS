@@ -1,4 +1,6 @@
-DROP PROCEDURE queue_loot_item cascade;
+DROP PROCEDURE IF EXISTS queue_loot_item cascade;
+DROP PROCEDURE IF EXISTS loot_item cascade;
+
 CREATE OR REPLACE PROCEDURE queue_loot_item(
     char_id INT,
     p_item_id INT
@@ -67,7 +69,6 @@ BEGIN
     );
 END;
 $$;
-DROP PROCEDURE loot_item cascade;
 CREATE OR REPLACE PROCEDURE loot_item(
     char_id INT,
     p_item_id INT
@@ -91,16 +92,8 @@ BEGIN
 		RAISE NOTICE 'Character is not in batlle';
 		RETURN;
 	END IF;
-	
-    -- Roll 50% chance for success (random() returns 0.0 <= x < 1.0)
-    loot_roll := random();
-    
-    IF loot_roll < 0.2 THEN
-        RAISE NOTICE 'Loot attempt failed (rolled % < 0.2)', loot_roll;
-        RETURN;
-    END IF;
 
-    -- Check if item exists in battle inventory
+	-- Check if item exists in battle inventory
     SELECT quantity INTO item_quantity
     FROM battle_inventory
     WHERE battle_id = current_battle
@@ -109,6 +102,14 @@ BEGIN
 
     IF NOT FOUND THEN
         RAISE NOTICE 'Item % not found in battle %', p_item_id, current_battle;
+        RETURN;
+    END IF;
+
+    -- Roll 50% chance for success (random() returns 0.0 <= x < 1.0)
+    loot_roll := random();
+    
+    IF loot_roll < 0.2 THEN
+        RAISE NOTICE 'Loot attempt failed (rolled % < 0.2)', loot_roll;
         RETURN;
     END IF;
 
